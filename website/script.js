@@ -11,17 +11,23 @@ function wgl_setup(){
 
     const vertexShader = `
     attribute vec4 aVertexPosition;
+    attribute vec4 aVertexColor;
+
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
+    varying lowp vec4 vColor;
+
     void main(){
         gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+        vColor = aVertexColor;
     }
    `;
 
     const fragShader = `
+    varying lowp vec4 vColor;
     void main(){
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        gl_FragColor = vColor;
     }
     `;
 
@@ -32,6 +38,7 @@ function wgl_setup(){
         program: shaders,
         attribLocations: {
             vertexPosition: wgl.getAttribLocation(shaders, "aVertexPosition"),
+            vertexColor: wgl.getAttribLocation(shaders, "aVertexColor"),
         },
         uniformLocations: {
             projectionMatrix: wgl.getUniformLocation(shaders, "uProjectionMatrix"),
@@ -63,9 +70,11 @@ function wgl_shader_init(wgl, vertexShaderglsl, fragShaderglsl){
 
 function initBuffers(wgl){
     const positionBuffer = initPositionBuffer(wgl);
+    const colorBuffer = initColorBuffer(wgl);
 
     return {
         position: positionBuffer,
+        color: colorBuffer,
     };
 }
 
@@ -108,6 +117,7 @@ function wgl_draw(wgl, programInfo, buffers){
     mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0],);
 
     setPositionAttribute(wgl, buffers, programInfo);
+    setColorAttribute(wgl, buffers, programInfo);
 
     wgl.useProgram(programInfo.program);
 
@@ -132,4 +142,49 @@ function setPositionAttribute(wgl, buffers, programInfo){
     wgl.bindBuffer(wgl.ARRAY_BUFFER, buffers.position);
     wgl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, numComponents, type, normalize, stride, offset);
     wgl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+}
+
+function setColorAttribute(wgl, buffers, programInfo){
+    const numComponents = 4;
+    const type = wgl.FLOAT;
+    const normalize = false;
+    const stride = 0;
+    const offset = 0;
+
+    wgl.bindBuffer(wgl.ARRAY_BUFFER, buffers.color);
+    wgl.vertexAttribPointer(
+        programInfo.attribLocations.vertexColor,
+        numComponents,
+        type,
+        normalize,
+        stride,
+        offset,
+    );
+    wgl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
+}
+function initColorBuffer(wgl){
+    const colors = [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+    ];
+
+    const colorBuffer = wgl.createBuffer();
+    wgl.bindBuffer(wgl.ARRAY_BUFFER, colorBuffer);
+    wgl.bufferData(wgl.ARRAY_BUFFER, new Float32Array(colors), wgl.STATIC_DRAW);
+
+    return colorBuffer;
 }
