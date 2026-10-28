@@ -1,4 +1,6 @@
 wgl_setup();
+let squareRotation = 0.0;
+let deltaTime = 0;
 
 function wgl_setup(){
     const canvas = document.getElementById("cvs");
@@ -47,7 +49,19 @@ function wgl_setup(){
     };
 
     const buffers = initBuffers(wgl);
-    wgl_draw(wgl, shaderInfo, buffers);
+    let then = 0;
+
+    function render(now){
+        now *= 0.001;
+        deltaTime = now - then;
+        then = now;
+
+        wgl_draw(wgl, shaderInfo, buffers, squareRotation);
+        squareRotation += deltaTime
+
+        requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
 }
 
 function wgl_shader_init(wgl, vertexShaderglsl, fragShaderglsl){
@@ -97,7 +111,7 @@ function loadShader(wgl, type, source){
     return shader;
 }
 
-function wgl_draw(wgl, programInfo, buffers){
+function wgl_draw(wgl, programInfo, buffers, squareRotation){
     //Screen Clear
     wgl.clearColor(0.0, 0.0, 0.0, 1.0);
     wgl.clearDepth(1.0);
@@ -115,6 +129,7 @@ function wgl_draw(wgl, programInfo, buffers){
 
     const modelViewMatrix =  mat4.create();
     mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0],);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, squareRotation, [0,0,1],);
 
     setPositionAttribute(wgl, buffers, programInfo);
     setColorAttribute(wgl, buffers, programInfo);
