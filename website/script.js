@@ -1,5 +1,5 @@
 wgl_setup();
-let squareRotation = 0.0;
+let cubeRotation = 0.0;
 let deltaTime = 0;
 
 function wgl_setup(){
@@ -56,8 +56,8 @@ function wgl_setup(){
         deltaTime = now - then;
         then = now;
 
-        wgl_draw(wgl, shaderInfo, buffers, squareRotation);
-        squareRotation += deltaTime
+        wgl_draw(wgl, shaderInfo, buffers, cubeRotation);
+        cubeRotation += deltaTime
 
         requestAnimationFrame(render);
     }
@@ -85,10 +85,12 @@ function wgl_shader_init(wgl, vertexShaderglsl, fragShaderglsl){
 function initBuffers(wgl){
     const positionBuffer = initPositionBuffer(wgl);
     const colorBuffer = initColorBuffer(wgl);
+    const indexBuffer = initIndexBuffer(wgl);
 
     return {
         position: positionBuffer,
         color: colorBuffer,
+        indices: indexBuffer,
     };
 }
 
@@ -96,7 +98,25 @@ function initPositionBuffer(wgl){
     const positionBuffer = wgl.createBuffer();
     wgl.bindBuffer(wgl.ARRAY_BUFFER, positionBuffer);
 
-    const positions = [1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0];
+    const positions = [
+  // Front face
+  -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
+
+  // Back face
+  -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0,
+
+  // Top face
+  -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
+
+  // Bottom face
+  -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
+
+  // Right face
+  1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0,
+
+  // Left face
+  -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0,
+];
 
     wgl.bufferData(wgl.ARRAY_BUFFER, new Float32Array(positions), wgl.STATIC_DRAW);
 
@@ -111,7 +131,7 @@ function loadShader(wgl, type, source){
     return shader;
 }
 
-function wgl_draw(wgl, programInfo, buffers, squareRotation){
+function wgl_draw(wgl, programInfo, buffers, cubeRotation){
     //Screen Clear
     wgl.clearColor(0.0, 0.0, 0.0, 1.0);
     wgl.clearDepth(1.0);
@@ -129,11 +149,14 @@ function wgl_draw(wgl, programInfo, buffers, squareRotation){
 
     const modelViewMatrix =  mat4.create();
     mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0],);
-    mat4.rotate(modelViewMatrix, modelViewMatrix, squareRotation, [0,0,1],);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation, [0,0,1],);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation * 0.7, [0,1,0],);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation * 0.3, [1,0,0],);
 
     setPositionAttribute(wgl, buffers, programInfo);
     setColorAttribute(wgl, buffers, programInfo);
 
+    wgl.bindBuffer(wgl.ELEMENT_ARRAY_BUFFER, buffers.indices);
     wgl.useProgram(programInfo.program);
 
     wgl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix,);
@@ -141,13 +164,14 @@ function wgl_draw(wgl, programInfo, buffers, squareRotation){
 
     {
         const offset = 0;
-        const vertexCount = 4;
-        wgl.drawArrays(wgl.TRIANGLE_STRIP, offset, vertexCount);
+        const vertexCount = 36;
+        const type = wgl.UNSIGNED_SHORT;
+        wgl.drawElements(wgl.TRIANGLES, vertexCount, type, offset);
     }
 }
 
 function setPositionAttribute(wgl, buffers, programInfo){
-    const numComponents = 2;
+    const numComponents = 3;
     const type = wgl.FLOAT;
     const normalize = false;
     const stride = 0;
@@ -178,28 +202,45 @@ function setColorAttribute(wgl, buffers, programInfo){
     wgl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
 }
 function initColorBuffer(wgl){
-    const colors = [
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        1.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        1.0,
-    ];
+    const faceColors = [
+  [1.0, 1.0, 1.0, 1.0], // Front face: white
+  [1.0, 0.0, 0.0, 1.0], // Back face: red
+  [0.0, 1.0, 0.0, 1.0], // Top face: green
+  [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
+  [1.0, 1.0, 0.0, 1.0], // Right face: yellow
+  [1.0, 0.0, 1.0, 1.0], // Left face: purple
+];
+
+// Convert the array of colors into a table for all the vertices.
+
+let colors = [];
+
+for (const c of faceColors) {
+  // Repeat each color four times for the four vertices of the face
+  colors = colors.concat(c, c, c, c);
+}
 
     const colorBuffer = wgl.createBuffer();
     wgl.bindBuffer(wgl.ARRAY_BUFFER, colorBuffer);
     wgl.bufferData(wgl.ARRAY_BUFFER, new Float32Array(colors), wgl.STATIC_DRAW);
 
     return colorBuffer;
+}
+
+function initIndexBuffer(wgl){
+    const indexBuffer = wgl.createBuffer();
+    wgl.bindBuffer(wgl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    const indices = [
+     0,  1,  2,      0,  2,  3,    // front
+     4,  5,  6,      4,  6,  7,    // back
+     8,  9,  10,     8,  10, 11,   // top
+     12, 13, 14,     12, 14, 15,   // bottom
+     16, 17, 18,     16, 18, 19,   // right
+     20, 21, 22,     20, 22, 23,   // left
+  ];
+
+  wgl.bufferData(wgl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), wgl.STATIC_DRAW,);
+
+  return indexBuffer;
 }
