@@ -1,246 +1,166 @@
-wgl_setup();
-let cubeRotation = 0.0;
-let deltaTime = 0;
 
-function wgl_setup(){
-    const canvas = document.getElementById("cvs");
-    const wgl = canvas.getContext("webgl");
+const canvas = document.getElementById("snow-canvas");
+const ctx = canvas.getContext("2d");
 
-    if(!wgl){
-        console.log("WebGL iniitiliazation failed");
-        return;
-    }
+const reducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)"
+);
 
-    const vertexShader = `
-    attribute vec4 aVertexPosition;
-    attribute vec4 aVertexColor;
+let width = window.innerWidth;
+let height = window.innerHeight;
+let snowflakes = [];
+let animationId = null;
 
-    uniform mat4 uModelViewMatrix;
-    uniform mat4 uProjectionMatrix;
+const snowCount = () => {
+    if (reducedMotion.matches) return 0;
 
-    varying lowp vec4 vColor;
-
-    void main(){
-        gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-        vColor = aVertexColor;
-    }
-   `;
-
-    const fragShader = `
-    varying lowp vec4 vColor;
-    void main(){
-        gl_FragColor = vColor;
-    }
-    `;
-
-
-    shaders = wgl_shader_init(wgl, vertexShader, fragShader);
-
-        const shaderInfo = {
-        program: shaders,
-        attribLocations: {
-            vertexPosition: wgl.getAttribLocation(shaders, "aVertexPosition"),
-            vertexColor: wgl.getAttribLocation(shaders, "aVertexColor"),
-        },
-        uniformLocations: {
-            projectionMatrix: wgl.getUniformLocation(shaders, "uProjectionMatrix"),
-            modelViewMatrix: wgl.getUniformLocation(shaders, "uModelViewMatrix"),
-        },
-    };
-
-    const buffers = initBuffers(wgl);
-    let then = 0;
-
-    function render(now){
-        now *= 0.001;
-        deltaTime = now - then;
-        then = now;
-
-        wgl_draw(wgl, shaderInfo, buffers, cubeRotation);
-        cubeRotation += deltaTime
-
-        requestAnimationFrame(render);
-    }
-    requestAnimationFrame(render);
-}
-
-function wgl_shader_init(wgl, vertexShaderglsl, fragShaderglsl){
-
-    const verts = loadShader(wgl, wgl.VERTEX_SHADER, vertexShaderglsl);
-    const frags = loadShader(wgl, wgl.FRAGMENT_SHADER, fragShaderglsl);
-
-    const shaders = wgl.createProgram();
-    wgl.attachShader(shaders, verts);
-    wgl.attachShader(shaders, frags);
-    wgl.linkProgram(shaders);
-
-    if(!wgl.getProgramParameter(shaders, wgl.LINK_STATUS)){
-        console.log("Failed to initialise shaders");
-        return;
-    }
-
-    return shaders;
-}
-
-function initBuffers(wgl){
-    const positionBuffer = initPositionBuffer(wgl);
-    const colorBuffer = initColorBuffer(wgl);
-    const indexBuffer = initIndexBuffer(wgl);
-
-    return {
-        position: positionBuffer,
-        color: colorBuffer,
-        indices: indexBuffer,
-    };
-}
-
-function initPositionBuffer(wgl){
-    const positionBuffer = wgl.createBuffer();
-    wgl.bindBuffer(wgl.ARRAY_BUFFER, positionBuffer);
-
-    const positions = [
-  // Front face
-  -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
-
-  // Back face
-  -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0,
-
-  // Top face
-  -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
-
-  // Bottom face
-  -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
-
-  // Right face
-  1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0,
-
-  // Left face
-  -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0,
-];
-
-    wgl.bufferData(wgl.ARRAY_BUFFER, new Float32Array(positions), wgl.STATIC_DRAW);
-
-    return positionBuffer
-}
-
-function loadShader(wgl, type, source){
-    const shader = wgl.createShader(type);
-    wgl.shaderSource(shader, source);
-    wgl.compileShader(shader);
-
-    return shader;
-}
-
-function wgl_draw(wgl, programInfo, buffers, cubeRotation){
-    //Screen Clear
-    wgl.clearColor(0.0, 0.0, 0.0, 1.0);
-    wgl.clearDepth(1.0);
-    wgl.enable(wgl.DEPTH_TEST);
-    wgl.depthFunc(wgl.LEQUAL);
-    wgl.clear(wgl.COLOR_BUFFER_BIT | wgl.DEPTH_BUFFER_BIT);
-
-    const fov = (45 * Math.PI) / 180;
-    const aspect = wgl.canvas.clientWidth / wgl.canvas.clientHeight;
-    const zNear = 0.1;
-    const zFar = 100.0;
-
-    const projectionMatrix = mat4.create();
-    mat4.perspective(projectionMatrix, fov, aspect, zNear, zFar);
-
-    const modelViewMatrix =  mat4.create();
-    mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0],);
-    mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation, [0,0,1],);
-    mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation * 0.7, [0,1,0],);
-    mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation * 0.3, [1,0,0],);
-
-    setPositionAttribute(wgl, buffers, programInfo);
-    setColorAttribute(wgl, buffers, programInfo);
-
-    wgl.bindBuffer(wgl.ELEMENT_ARRAY_BUFFER, buffers.indices);
-    wgl.useProgram(programInfo.program);
-
-    wgl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix,);
-    wgl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix,);
-
-    {
-        const offset = 0;
-        const vertexCount = 36;
-        const type = wgl.UNSIGNED_SHORT;
-        wgl.drawElements(wgl.TRIANGLES, vertexCount, type, offset);
-    }
-}
-
-function setPositionAttribute(wgl, buffers, programInfo){
-    const numComponents = 3;
-    const type = wgl.FLOAT;
-    const normalize = false;
-    const stride = 0;
-
-    const offset = 0;
-
-    wgl.bindBuffer(wgl.ARRAY_BUFFER, buffers.position);
-    wgl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, numComponents, type, normalize, stride, offset);
-    wgl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-}
-
-function setColorAttribute(wgl, buffers, programInfo){
-    const numComponents = 4;
-    const type = wgl.FLOAT;
-    const normalize = false;
-    const stride = 0;
-    const offset = 0;
-
-    wgl.bindBuffer(wgl.ARRAY_BUFFER, buffers.color);
-    wgl.vertexAttribPointer(
-        programInfo.attribLocations.vertexColor,
-        numComponents,
-        type,
-        normalize,
-        stride,
-        offset,
+    // Adjust the density for different screen sizes.
+    return Math.min(
+        180,
+        Math.max(45, Math.floor((width * height) / 8500))
     );
-    wgl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
-}
-function initColorBuffer(wgl){
-    const faceColors = [
-  [1.0, 1.0, 1.0, 1.0], // Front face: white
-  [1.0, 0.0, 0.0, 1.0], // Back face: red
-  [0.0, 1.0, 0.0, 1.0], // Top face: green
-  [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
-  [1.0, 1.0, 0.0, 1.0], // Right face: yellow
-  [1.0, 0.0, 1.0, 1.0], // Left face: purple
-];
+};
 
-// Convert the array of colors into a table for all the vertices.
+function resizeCanvas() {
+    width = window.innerWidth;
+    height = window.innerHeight;
 
-let colors = [];
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-for (const c of faceColors) {
-  // Repeat each color four times for the four vertices of the face
-  colors = colors.concat(c, c, c, c);
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    createSnowflakes();
 }
 
-    const colorBuffer = wgl.createBuffer();
-    wgl.bindBuffer(wgl.ARRAY_BUFFER, colorBuffer);
-    wgl.bufferData(wgl.ARRAY_BUFFER, new Float32Array(colors), wgl.STATIC_DRAW);
+function createSnowflakes() {
+    const count = snowCount();
 
-    return colorBuffer;
+    snowflakes = Array.from({ length: count }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+
+        // Different sizes create depth.
+        radius: Math.random() * 2.5 + 0.6,
+
+        // Smaller flakes tend to fall more slowly.
+        speed: Math.random() * 0.8 + 0.3,
+
+        drift: Math.random() * 0.6 - 0.3,
+        opacity: Math.random() * 0.65 + 0.2,
+
+        // Individual movement for a natural effect.
+        phase: Math.random() * Math.PI * 2,
+        sway: Math.random() * 0.4 + 0.1
+    }));
 }
 
-function initIndexBuffer(wgl){
-    const indexBuffer = wgl.createBuffer();
-    wgl.bindBuffer(wgl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+let frame = 0;
 
-    const indices = [
-     0,  1,  2,      0,  2,  3,    // front
-     4,  5,  6,      4,  6,  7,    // back
-     8,  9,  10,     8,  10, 11,   // top
-     12, 13, 14,     12, 14, 15,   // bottom
-     16, 17, 18,     16, 18, 19,   // right
-     20, 21, 22,     20, 22, 23,   // left
-  ];
+function drawSnow() {
+    ctx.clearRect(0, 0, width, height);
 
-  wgl.bufferData(wgl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), wgl.STATIC_DRAW,);
+    frame++;
 
-  return indexBuffer;
+    for (const flake of snowflakes) {
+        // Soft horizontal drifting.
+        flake.phase += 0.008;
+
+        flake.x += flake.drift + Math.sin(
+            flake.phase + frame * 0.003
+        ) * flake.sway;
+
+        // Downward movement.
+        flake.y += flake.speed;
+
+        // Wrap around the screen edges.
+        if (flake.x > width + 5) flake.x = -5;
+        if (flake.x < -5) flake.x = width + 5;
+
+        // Start again at the top after falling off-screen.
+        if (flake.y > height + 5) {
+            flake.y = -5;
+            flake.x = Math.random() * width;
+        }
+
+        // Draw a softly glowing white snowball.
+        ctx.beginPath();
+
+        ctx.arc(
+            flake.x,
+            flake.y,
+            flake.radius,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = `rgba(240, 248, 255, ${flake.opacity})`;
+
+        // A subtle glow on larger flakes.
+        if (flake.radius > 1.8) {
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "rgba(191, 219, 254, 0.8)";
+        } else {
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.fill();
+    }
+
+    ctx.shadowBlur = 0;
+
+    if (!reducedMotion.matches) {
+        animationId = requestAnimationFrame(drawSnow);
+    } else {
+        animationId = null;
+    }
 }
+
+// Handle the mobile navigation.
+const menuToggle = document.getElementById("menu-toggle");
+const navLinks = document.getElementById("nav-links");
+
+menuToggle.addEventListener("click", () => {
+    const isOpen = navLinks.classList.toggle("open");
+
+    menuToggle.setAttribute("aria-expanded", String(isOpen));
+    menuToggle.setAttribute(
+        "aria-label",
+        isOpen ? "Close navigation menu" : "Open navigation menu"
+    );
+
+    menuToggle.textContent = isOpen ? "✕" : "☰";
+});
+
+// Close the mobile menu after selecting a section.
+navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+        navLinks.classList.remove("open");
+        menuToggle.setAttribute("aria-expanded", "false");
+        menuToggle.setAttribute("aria-label", "Open navigation menu");
+        menuToggle.textContent = "☰";
+    });
+});
+
+// Recalculate snowfall when the screen size changes.
+window.addEventListener("resize", resizeCanvas);
+
+// Stop or restart the animation if motion preferences change.
+reducedMotion.addEventListener("change", () => {
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
+    resizeCanvas();
+    drawSnow();
+});
+
+// Start everything.
+resizeCanvas();
+drawSnow();
